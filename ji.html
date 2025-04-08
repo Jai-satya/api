@@ -101,11 +101,21 @@
       </div>
     </div>
 
+    <!-- Add a "Delete Selected" button above the table -->
+    <div class="flex justify-end mb-4">
+      <button onclick="deleteSelectedFunds()" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+        Delete Selected
+      </button>
+    </div>
+
     <!-- Fund Table -->
     <div class="overflow-x-auto mb-6">
       <table class="w-full bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden">
         <thead class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-white">
           <tr>
+            <th class="p-3 text-left">
+              <input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)" />
+            </th>
             <th class="p-3 text-left">Fund Name</th>
             <th class="p-3 text-left">Invested Value</th>
             <th class="p-3 text-left">Current Value</th>
@@ -220,6 +230,32 @@
       }
     }
 
+    // Function to toggle all checkboxes
+    function toggleSelectAll(checkbox) {
+      const checkboxes = document.querySelectorAll("#fundBody input[type='checkbox']");
+      checkboxes.forEach(cb => cb.checked = checkbox.checked);
+    }
+
+    // Function to delete selected funds
+    function deleteSelectedFunds() {
+      const checkboxes = document.querySelectorAll("#fundBody input[type='checkbox']:checked");
+      if (checkboxes.length === 0) {
+        alert("No funds selected for deletion.");
+        return;
+      }
+
+      if (confirm(`Are you sure you want to delete ${checkboxes.length} selected fund(s)?`)) {
+        const funds = getFunds();
+        const remainingFunds = funds.filter((_, index) => {
+          return !Array.from(checkboxes).some(cb => parseInt(cb.dataset.index) === index);
+        });
+
+        saveFunds(remainingFunds);
+        renderFunds();
+      }
+    }
+
+    // Modify the renderFunds function to include checkboxes
     function renderFunds() {
       let funds = getFunds();
       
@@ -260,6 +296,9 @@
         
         fundBody.innerHTML += `
           <tr class="border-t border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <td class="p-3">
+              <input type="checkbox" data-index="${index}" />
+            </td>
             <td class="p-3"><input type="text" value="${fund.name}" class="p-2 border rounded w-full text-black" onchange="updateField(${index}, 'name', this.value)" /></td>
             <td class="p-3"><input type="number" value="${fund.investedValue}" class="p-2 border rounded w-full text-black" onchange="updateField(${index}, 'investedValue', parseFloat(this.value))" /></td>
             <td class="p-3"><input type="number" value="${fund.currentValue}" class="p-2 border rounded w-full text-black" onchange="updateField(${index}, 'currentValue', parseFloat(this.value))" /></td>
