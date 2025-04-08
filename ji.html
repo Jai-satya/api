@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mutual Fund Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen p-6 transition-colors dark:bg-gray-900 dark:text-white">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      <h1 class="text-3xl font-bold">Mutual Fund Tracker</h1>
+      <div class="flex gap-2">
+        <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded transition-colors hover:bg-green-700">
+          Export Data
+        </button>
+        <button id="backupBtn" class="bg-blue-600 text-white px-4 py-2 rounded transition-colors hover:bg-blue-700">
+          Backup Data
+        </button>
+        <input type="file" id="restoreInput" accept=".json" class="hidden" />
+        <button id="restoreBtn" class="bg-purple-600 text-white px-4 py-2 rounded transition-colors hover:bg-purple-700">
+          Restore Data
+        </button>
+        <button id="themeToggle" class="bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800 px-4 py-2 rounded transition-colors">
+          Toggle Theme
+        </button>
+      </div>
+    </div>
+
+    <!-- Summary Section -->
+    <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Portfolio Summary</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-blue-100 dark:bg-blue-900 p-4 rounded-lg">
+          <h3 class="text-sm text-gray-600 dark:text-gray-300">Total Invested</h3>
+          <p class="text-2xl font-bold" id="totalInvested">₹0</p>
+        </div>
+        <div class="bg-green-100 dark:bg-green-900 p-4 rounded-lg">
+          <h3 class="text-sm text-gray-600 dark:text-gray-300">Current Value</h3>
+          <p class="text-2xl font-bold" id="totalCurrent">₹0</p>
+        </div>
+        <div class="bg-purple-100 dark:bg-purple-900 p-4 rounded-lg">
+          <h3 class="text-sm text-gray-600 dark:text-gray-300">Total Returns</h3>
+          <p class="text-2xl font-bold" id="totalReturns">₹0</p>
+        </div>
+        <div class="bg-yellow-100 dark:bg-yellow-900 p-4 rounded-lg">
+          <h3 class="text-sm text-gray-600 dark:text-gray-300">Returns %</h3>
+          <p class="text-2xl font-bold" id="returnsPercent">0%</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload CAS PDF -->
+    <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Import CAS Statement</h2>
+      <div class="flex flex-col">
+        <input type="file" id="pdfInput" accept="application/pdf" class="mb-2" />
+        <div id="pdfStatus" class="text-sm text-gray-600 dark:text-gray-300 mt-2"></div>
+      </div>
+    </div>
+
+    <!-- Add New Fund Section -->
+    <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Add New Fund</h2>
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+        <input type="text" id="fundName" placeholder="Fund Name" class="p-2 border rounded text-black" required />
+        <input type="number" id="investedValue" placeholder="Invested Value" class="p-2 border rounded text-black" required />
+        <input type="number" id="currentValue" placeholder="Current Value" class="p-2 border rounded text-black" required />
+        <input type="date" id="investmentDate" class="p-2 border rounded text-black" required />
+        <button onclick="addFund()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add Fund</button>
+      </div>
+      <div id="addFundError" class="text-red-500 text-sm mt-2 hidden"></div>
+    </div>
+
+    <!-- Search and Filter -->
+    <div class="flex justify-between items-center mb-4">
+      <div class="relative w-full md:w-1/3">
+        <input type="text" id="searchInput" placeholder="Search funds..." 
+               class="w-full p-2 pl-8 border rounded text-black" />
+        <svg class="w-4 h-4 absolute left-2.5 top-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+      </div>
+      <div class="flex gap-2">
+        <select id="sortOption" class="p-2 border rounded text-black">
+          <option value="name">Sort by Name</option>
+          <option value="investedValue">Sort by Invested Value</option>
+          <option value="currentValue">Sort by Current Value</option>
+          <option value="returns">Sort by Returns %</option>
+          <option value="date">Sort by Date</option>
+        </select>
+        <button id="sortDirection" class="bg-gray-200 dark:bg-gray-700 p-2 rounded">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Fund Table -->
+    <div class="overflow-x-auto mb-6">
+      <table class="w-full bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden">
+        <thead class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-white">
+          <tr>
+            <th class="p-3 text-left">Fund Name</th>
+            <th class="p-3 text-left">Invested Value</th>
+            <th class="p-3 text-left">Current Value</th>
+            <th class="p-3 text-left">Returns</th>
+            <th class="p-3 text-left">Returns %</th>
+            <th class="p-3 text-left">Weight (%)</th>
+            <th class="p-3 text-left">Date</th>
+            <th class="p-3 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="fundBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Chart Section -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+        <h2 class="text-xl font-semibold mb-4">Fund Distribution</h2>
+        <canvas id="fundChart"></canvas>
+      </div>
+      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+        <h2 class="text-xl font-semibold mb-4">Returns Analysis</h2>
+        <canvas id="returnsChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // PDF.js setup
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    
+    // References to DOM elements
+    const fundBody = document.getElementById("fundBody");
+    const searchInput = document.getElementById("searchInput");
+    const sortOption = document.getElementById("sortOption");
+    const sortDirectionBtn = document.getElementById("sortDirection");
+    const addFundError = document.getElementById("addFundError");
+    const pdfStatus = document.getElementById("pdfStatus");
+    
+    // Chart references
+    let fundChart;
+    let returnsChart;
+    let sortAscending = true;
+
+    // Fund operations
+    function getFunds() {
+      return JSON.parse(localStorage.getItem("funds")) || [];
+    }
+
+    function saveFunds(funds) {
+      localStorage.setItem("funds", JSON.stringify(funds));
+    }
+
+    // Theme toggle functionality
+    function toggleTheme() {
+      const html = document.documentElement;
+      html.classList.toggle("dark");
+      const theme = html.classList.contains("dark") ? "dark" : "light";
+      localStorage.setItem("theme", theme);
+      updateChartTheme();
+    }
+
+    function loadTheme() {
+      const savedTheme = localStorage.getItem("theme") || "light";
+      document.documentElement.classList.toggle("dark", savedTheme === "dark");
+    }
+
+    function updateChartTheme() {
+      // Update chart colors based on theme
+      const textColor = document.documentElement.classList.contains("dark") ? "white" : "black";
+      
+      // Update both charts if they exist
+      if (fundChart) {
+        fundChart.options.plugins.legend.labels.color = textColor;
+        fundChart.update();
+      }
+      
+      if (returnsChart) {
+        returnsChart.options.plugins.legend.labels.color = textColor;
+        returnsChart.options.scales.x.ticks.color = textColor;
+        returnsChart.options.scales.y.ticks.color = textColor;
+        returnsChart.update();
+      }
+    }
+
+    // Calculate metrics
+    function calculateMetrics(funds) {
+      const totalInvested = funds.reduce((sum, f) => sum + f.investedValue, 0);
+      const totalCurrent = funds.reduce((sum, f) => sum + f.currentValue, 0);
+      const totalReturns = totalCurrent - totalInvested;
+      const returnsPercent = totalInvested > 0 ? (totalReturns / totalInvested) * 100 : 0;
+      
+      document.getElementById("totalInvested").textContent = `₹${totalInvested.toLocaleString()}`;
+      document.getElementById("totalCurrent").textContent = `₹${totalCurrent.toLocaleString()}`;
+      document.getElementById("totalReturns").textContent = `₹${totalReturns.toLocaleString()}`;
+      document.getElementById("returnsPercent").textContent = `${returnsPercent.toFixed(2)}%`;
+      
+      // Add appropriate colors based on returns
+      const returnsElement = document.getElementById("totalReturns");
+      const returnsPercentElement = document.getElementById("returnsPercent");
+      
+      if (totalReturns > 0) {
+        returnsElement.classList.add("text-green-600");
+        returnsElement.classList.remove("text-red-600");
+        returnsPercentElement.classList.add("text-green-600");
+        returnsPercentElement.classList.remove("text-red-600");
+      } else {
+        returnsElement.classList.add("text-red-600");
+        returnsElement.classList.remove("text-green-600");
+        returnsPercentElement.classList.add("text-red-600");
+        returnsPercentElement.classList.remove("text-green-600");
+      }
+    }
+
+    function renderFunds() {
+      let funds = getFunds();
+      
+      // Apply search filter
+      const searchTerm = searchInput.value.toLowerCase();
+      if (searchTerm) {
+        funds = funds.filter(fund => fund.name.toLowerCase().includes(searchTerm));
+      }
+      
+      // Apply sorting
+      const sortBy = sortOption.value;
+      funds.sort((a, b) => {
+        let valA, valB;
+        
+        if (sortBy === "returns") {
+          valA = (a.currentValue - a.investedValue) / a.investedValue * 100;
+          valB = (b.currentValue - b.investedValue) / b.investedValue * 100;
+        } else {
+          valA = a[sortBy];
+          valB = b[sortBy];
+        }
+        
+        if (typeof valA === "string") {
+          return sortAscending ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else {
+          return sortAscending ? valA - valB : valB - valA;
+        }
+      });
+      
+      fundBody.innerHTML = "";
+      const total = funds.reduce((sum, f) => sum + f.currentValue, 0);
+
+      funds.forEach((fund, index) => {
+        const returns = fund.currentValue - fund.investedValue;
+        const returnsPercent = fund.investedValue > 0 ? (returns / fund.investedValue) * 100 : 0;
+        const weight = total ? ((fund.currentValue / total) * 100).toFixed(2) : 0;
+        const returnsClass = returns >= 0 ? "text-green-600" : "text-red-600";
+        
+        fundBody.innerHTML += `
+          <tr class="border-t border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <td class="p-3"><input type="text" value="${fund.name}" class="p-2 border rounded w-full text-black" onchange="updateField(${index}, 'name', this.value)" /></td>
+            <td class="p-3"><input type="number" value="${fund.investedValue}" class="p-2 border rounded w-full text-black" onchange="updateField(${index}, 'investedValue', parseFloat(this.value))" /></td>
+            <td class="p-3"><input type="number" value="${fund.currentValue}" class="p-2 border rounded w-full text-black" onchange="updateField(${index}, 'currentValue', parseFloat(this.value))" /></td>
+            <td class="p-3 ${returnsClass}">₹${returns.toLocaleString()}</td>
+            <td class="p-3 ${returnsClass}">${returnsPercent.toFixed(2)}%</td>
+            <td class="p-3 text-right">${weight}%</td>
+            <td class="p-3"><input type="date" value="${fund.date}" class="p-2 border rounded text-black" onchange="updateField(${index}, 'date', this.value)" /></td>
+            <td class="p-3">
+              <button onclick="deleteFund(${index})" class="text-red-600 hover:text-red-800">Delete</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      renderCharts(getFunds());
+      calculateMetrics(getFunds());
+    }
+
+    function renderCharts(funds) {
+      // Distribution Chart
+      const ctx = document.getElementById('fundChart').getContext('2d');
+      if (fundChart) fundChart.destroy();
+
+      fundChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: funds.map(f => f.name),
+          datasets: [{
+            data: funds.map(f => f.currentValue),
+            backgroundColor: [
+              '#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+              '#3B82F6', '#EC4899', '#22D3EE', '#A3E635', '#F97316'
+            ]
+          }]
+        },
+        options: {
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: {
+                color: document.documentElement.classList.contains("dark") ? "white" : "black"
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const value = context.raw;
+                  const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                  const percentage = ((value / total) * 100).toFixed(2);
+                  return `₹${value.toLocaleString()} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // Returns Chart
+      const returnsCtx = document.getElementById('returnsChart').getContext('2d');
+      if (returnsChart) returnsChart.destroy();
+      
+      returnsChart = new Chart(returnsCtx, {
+        type: 'bar',
+        data: {
+          labels: funds.map(f => f.name),
+          datasets: [{
+            label: 'Returns %',
+            data: funds.map(f => ((f.currentValue - f.investedValue) / f.investedValue * 100).toFixed(2)),
+            backgroundColor: funds.map(f => (f.currentValue >= f.investedValue) ? '#10B981' : '#EF4444')
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: {
+            legend: {
+              display: false
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                color: document.documentElement.classList.contains("dark") ? "white" : "black"
+              },
+              grid: {
+                color: document.documentElement.classList.contains("dark") ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+              }
+            },
+            y: {
+              ticks: {
+                color: document.documentElement.classList.contains("dark") ? "white" : "black"
+              },
+              grid: {
+                color: document.documentElement.classList.contains("dark") ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function updateField(index, field, value) {
+      const funds = getFunds();
+      funds[index][field] = value;
+      saveFunds(funds);
+      renderFunds();
+    }
+
+    function deleteFund(index) {
+      if (confirm("Are you sure you want to delete this fund?")) {
+        const funds = getFunds();
+        funds.splice(index, 1);
+        saveFunds(funds);
+        renderFunds();
+      }
+    }
+
+    function addFund() {
+      const name = document.getElementById("fundName").value.trim();
+      const investedValue = parseFloat(document.getElementById("investedValue").value);
+      const currentValue = parseFloat(document.getElementById("currentValue").value);
+      const date = document.getElementById("investmentDate").value || new Date().toISOString().split("T")[0];
+
+      // Validation
+      if (!name) {
+        showError("Please enter a fund name");
+        return;
+      }
+      
+      if (isNaN(investedValue) || investedValue <= 0) {
+        showError("Please enter a valid invested value");
+        return;
+      }
+      
+      if (isNaN(currentValue) || currentValue <= 0) {
+        showError("Please enter a valid current value");
+        return;
+      }
+
+      hideError();
+      
+      const funds = getFunds();
+      funds.push({ name, investedValue, currentValue, date });
+      saveFunds(funds);
+      renderFunds();
+
+      // Clear form
+      document.getElementById("fundName").value = "";
+      document.getElementById("investedValue").value = "";
+      document.getElementById("currentValue").value = "";
+      document.getElementById("investmentDate").value = "";
+    }
+    
+    function showError(message) {
+      addFundError.textContent = message;
+      addFundError.classList.remove("hidden");
+    }
+    
+    function hideError() {
+      addFundError.classList.add("hidden");
+    }
+
+    async function handlePDFUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      pdfStatus.textContent = "Processing PDF, please wait...";
+      
+      try {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const typedarray = new Uint8Array(reader.result);
+          
+          try {
+            const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+            let fundsAdded = 0;
+            const funds = getFunds();
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const textContent = await page.getTextContent();
+              const pageText = textContent.items.map(item => item.str).join(' ');
+              
+              // Look for different patterns that might appear in CAS statements
+              const fundRegex = /([A-Za-z\s\-\&\.]+(?:Fund|Growth|Equity|Debt|Liquid|Balanced|Index|ETF)[A-Za-z\s\-\&\.]*)\s+([\d,\.]+)\s+([\d,\.]+)/g;
+              let match;
+              
+              while ((match = fundRegex.exec(pageText)) !== null) {
+                const name = match[1].trim();
+                // Remove commas from number strings before parsing
+                const investedValue = parseFloat(match[2].replace(/,/g, ""));
+                const currentValue = parseFloat(match[3].replace(/,/g, ""));
+                
+                if (!isNaN(investedValue) && !isNaN(currentValue) && name.length > 3) {
+                  const date = new Date().toISOString().split("T")[0];
+                  
+                  // Check if fund already exists
+                  const existingFundIndex = funds.findIndex(f => f.name.toLowerCase() === name.toLowerCase());
+                  
+                  if (existingFundIndex >= 0) {
+                    // Update existing fund
+                    funds[existingFundIndex].investedValue = investedValue;
+                    funds[existingFundIndex].currentValue = currentValue;
+                  } else {
+                    // Add new fund
+                    funds.push({ name, investedValue, currentValue, date });
+                    fundsAdded++;
+                  }
+                }
+              }
+            }
+            
+            saveFunds(funds);
+            renderFunds();
+            
+            pdfStatus.textContent = `PDF processed successfully. ${fundsAdded} new funds added.`;
+            // Clear the file input
+            document.getElementById("pdfInput").value = "";
+          } catch (error) {
+            pdfStatus.textContent = `Error processing PDF: ${error.message}`;
+            console.error("PDF processing error:", error);
+          }
+        };
+        
+        reader.readAsArrayBuffer(file);
+      } catch (error) {
+        pdfStatus.textContent = `Error reading file: ${error.message}`;
+        console.error("File reading error:", error);
+      }
+    }
+    
+    // Export functionality
+    function exportToPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      
+      // Add title
+      doc.setFontSize(16);
+      doc.text("Mutual Fund Portfolio Summary", 14, 20);
+      
+      // Add date
+      doc.setFontSize(10);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
+      
+      // Add summary
+      doc.setFontSize(12);
+      doc.text("Portfolio Summary", 14, 40);
+      
+      const funds = getFunds();
+      const totalInvested = funds.reduce((sum, f) => sum + f.investedValue, 0);
+      const totalCurrent = funds.reduce((sum, f) => sum + f.currentValue, 0);
+      const totalReturns = totalCurrent - totalInvested;
+      const returnsPercent = totalInvested > 0 ? (totalReturns / totalInvested) * 100 : 0;
+      
+      doc.setFontSize(10);
+      doc.text(`Total Invested: ₹${totalInvested.toLocaleString()}`, 14, 50);
+      doc.text(`Current Value: ₹${totalCurrent.toLocaleString()}`, 14, 56);
+      doc.text(`Total Returns: ₹${totalReturns.toLocaleString()}`, 14, 62);
+      doc.text(`Returns %: ${returnsPercent.toFixed(2)}%`, 14, 68);
+      
+      // Add table
+      const tableData = funds.map(fund => {
+        const returns = fund.currentValue - fund.investedValue;
+        const returnsPercent = fund.investedValue > 0 ? (returns / fund.investedValue) * 100 : 0;
+        return [
+          fund.name,
+          `₹${fund.investedValue.toLocaleString()}`,
+          `₹${fund.currentValue.toLocaleString()}`,
+          `₹${returns.toLocaleString()}`,
+          `${returnsPercent.toFixed(2)}%`,
+          fund.date
+        ];
+      });
+      
+      doc.autoTable({
+        startY: 75,
+        head: [['Fund Name', 'Invested Value', 'Current Value', 'Returns', 'Returns %', 'Date']],
+        body: tableData,
+        theme: 'grid'
+      });
+      
+      // Save PDF
+      doc.save('mutual-fund-portfolio.pdf');
+    }
+    
+    // Backup/Restore functionality
+    function backupData() {
+      const funds = getFunds();
+      const dataStr = JSON.stringify(funds);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      
+      const exportFileDefaultName = `fund-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+    }
+    
+    function restoreData() {
+      document.getElementById('restoreInput').click();
+    }
+    
+    function handleRestore(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const funds = JSON.parse(e.target.result);
+          if (Array.isArray(funds)) {
+            if (confirm(`Are you sure you want to restore ${funds.length} funds? This will replace your current data.`)) {
+              saveFunds(funds);
+              renderFunds();
+              alert('Data restored successfully!');
+            }
+          } else {
+            alert('Invalid backup file format.');
+          }
+        } catch (error) {
+          alert(`Error restoring data: ${error.message}`);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // Event listeners
+    window.onload = () => {
+      loadTheme();
+      renderFunds();
+      
+      // Add event listeners
+      document.getElementById("themeToggle").addEventListener("click", toggleTheme);
+      document.getElementById("pdfInput").addEventListener("change", handlePDFUpload);
+      document.getElementById("searchInput").addEventListener("input", renderFunds);
+      document.getElementById("sortOption").addEventListener("change", renderFunds);
+      document.getElementById("sortDirection").addEventListener("click", () => {
+        sortAscending = !sortAscending;
+        renderFunds();
+      });
+      document.getElementById("exportBtn").addEventListener("click", exportToPDF);
+      document.getElementById("backupBtn").addEventListener("click", backupData);
+      document.getElementById("restoreBtn").addEventListener("click", restoreData);
+      document.getElementById("restoreInput").addEventListener("change", handleRestore);
+    }
+  </script>
+</body>
+</html>
